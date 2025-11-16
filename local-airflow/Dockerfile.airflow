@@ -1,0 +1,23 @@
+# 1. Usar a imagem oficial do Airflow
+FROM apache/airflow:2.8.1-python3.10
+
+# 2. Definir o usuário como root para instalar pacotes
+USER root
+
+# 3. Instalar pacotes do sistema necessários (Docker CLI)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    moby-cli && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# 6. Voltar para o usuário padrão 'airflow'
+USER airflow
+
+# 4. Copiar o requirements.txt do Airflow
+COPY requirements.txt /requirements.txt
+
+# 5. Instalar as dependências Python (providers da Amazon e Docker)
+RUN pip install --no-cache-dir -r /requirements.txt
+
