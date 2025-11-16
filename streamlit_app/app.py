@@ -285,58 +285,46 @@ def main():
     # # 2. Mostra o cabeçalho e o formulário de busca
     product_id, submit = display_header_and_form()
 
+    # # 3. Cria um "placeholder" que podemos atualizar ou limpar
     placeholder = st.empty() 
-    log_box = st.container() 
 
+    # # 4. Lógica de execução (só roda se o botão "Analisar" for clicado)
     if submit and product_id:
+        
+        # 4.1. Mostra uma mensagem de "buscando"
         with placeholder.container(): 
             st.markdown(
-                    """
-                    <div style="display: flex; justify-content: center; align-items: center; height: 40vh;">
-                        <h4 style="color: black;">🔎 Verificando análises existentes...</h4>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                """
+                <div style="display: flex; justify-content: center; align-items: center; height: 40vh;">
+                    <h4 style="color: black;">🔎 Verificando análises existentes...</h4>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-            prediction_results = read_s3_file(product_id=product_id, s3_bucket=s3_bucket)
+        # 4.2. Tenta carregar os resultados JÁ PRONTOS do S3
+        prediction_results = read_s3_file(product_id=product_id, s3_bucket=s3_bucket)
+        
+        # # 4.3. Limpa a mensagem "buscando"
+        placeholder.empty()
 
-            placeholder.empty()
+        # # 4.4. Decide o que fazer:
+        if prediction_results is None:
+            display_processing_message(product_id)
+            trigger_airflow_dag(product_id=product_id, airflow_api_password=airflow_api_password, airflow_api_user=airflow_api_user)
+            
+            for i in range(10):
+                time.sleep(30)
+                prediction_results = read_s3_file(product_id=product_id, s3_bucket=s3_bucket, show_message=False)
+                if prediction_results is not None:
+                    placeholder.empty()
+                    display_results_dashboard(results=prediction_results, product_id=product_id)
+                    break
+            
+        else:
+            display_results_dashboard(results=prediction_results, product_id=product_id)
 
-            if prediction_results is not None:
-                placeholder.empty()
-                display_results_dashboard(results=prediction_results, product_id=product_id)
-                return
 
-            else:
-                display_processing_message(product_id)
-                trigger_airflow_dag(
-                    product_id=product_id,
-                    airflow_api_password=airflow_api_password,
-                    airflow_api_user=airflow_api_user
-                )
 
-                for i in range(10):
-                    time.sleep(30)
-
-                    prediction_results = read_s3_file(
-                        product_id=product_id,
-                        s3_bucket=s3_bucket,
-                        show_message=False
-                    )
-
-                    if prediction_results is not None:
-                        placeholder.empty()
-                        display_results_dashboard(results=prediction_results, product_id=product_id)
-                        break
-                else:
-                    log_box.empty()
-                    with log_box:
-                        st.error("❌ Não foi possível obter os resultados após 10 tentativas.")
 
 main()
-        
-        
-        
-        
-       
