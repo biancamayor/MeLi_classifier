@@ -10,7 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
 
 try:
     from src.bertimbau_classifier import SentimentClassifier
-    # Importa seu classificador. O Dockerfile garantirá que a pasta 'src' esteja lá.
 except ImportError:
     print("Erro: Não foi possível encontrar 'bertimbau_classifier'.")
     print("Certifique-se que o arquivo 'src/bertimbau_classifier.py' existe.")
@@ -31,7 +30,6 @@ def read_csv_from_s3(s3_uri, csv_sep):
         
         body = response['Body'].read().decode('utf-8')
         
-        # Usa StringIO para tratar o texto como um arquivo
         return pd.read_csv(StringIO(body), sep=csv_sep)
 
     except Exception as e:

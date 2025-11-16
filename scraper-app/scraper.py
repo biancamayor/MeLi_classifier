@@ -2,17 +2,22 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import pandas as pd
-import argparse # NOVO: Para ler argumentos de linha de comando
-import boto3    # NOVO: Para salvar no S3
-from io import StringIO # NOVO: Para salvar o DataFrame em memória
+import argparse 
+import boto3   
+from io import StringIO 
+
 
 def scrape_reviews(product_id):
     reviews_list = []
 
+    
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'application/json'
+    "accept": "application/json",
+    "accept-encoding": "gzip, deflate",
+    "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/119.0.0.0"
     }
 
     product_url = f"https://produto.mercadolivre.com.br/{product_id}"
@@ -22,7 +27,7 @@ def scrape_reviews(product_id):
 
     offset = 0
     limit = 15
-    product_id_clean = product_id.replace('-', '') # Renomeado para não colidir
+    product_id_clean = product_id.replace('-', '') 
 
     while True:
         reviews_url = f"https://produto.mercadolivre.com.br/noindex/catalog/reviews/{product_id_clean}/search?objectId={product_id_clean}&siteId=MLB&isItem=true&offset={offset}&limit={limit}&x-is-webview=false"
@@ -42,15 +47,14 @@ def scrape_reviews(product_id):
                 break
         else:
             print("Resposta vazia do servidor")
-            break # Sai do loop se a resposta for vazia
+            break 
 
         if len(review_elements) == 0:
             print("Não há mais comentários para carregar.")
-            # NOVO: Em vez de salvar, criamos o DataFrame e o retornamos
             df = pd.DataFrame(reviews_list)
             if not df.empty:
-                 df['product_name'] = title
-            return df # Retorna o DataFrame
+                df['product_name'] = title
+            return df 
 
         else:
             for review in review_elements:
@@ -68,14 +72,14 @@ def scrape_reviews(product_id):
 
             offset += limit
     
-    # NOVO: Se o loop quebrar por erro, retorna um DF vazio
+
     print("Saindo do loop de scraping.")
     df = pd.DataFrame(reviews_list)
     if not df.empty:
         df['product_name'] = title
     return df
 
-# NOVO: Função para salvar o DataFrame no S3
+
 def save_df_to_s3(df, s3_uri):
     """Salva um DataFrame pandas em um local S3 no formato CSV (sep='█')."""
     if df.empty:
@@ -85,17 +89,14 @@ def save_df_to_s3(df, s3_uri):
     try:
         print(f"Iniciando salvamento em {s3_uri}...")
         
-        # Prepara o buffer de CSV em memória
         csv_buffer = StringIO()
         df.to_csv(csv_buffer, index=False, sep='█')
         
-        # Divide a URI S3 em bucket e chave
         if not s3_uri.startswith("s3://"):
             raise ValueError("URI de saída deve começar com 's3://'")
             
         bucket, key = s3_uri.replace("s3://", "").split("/", 1)
         
-        # Conecta ao S3 e faz o upload
         s3_client = boto3.client('s3')
         s3_client.put_object(
             Bucket=bucket,
@@ -108,9 +109,11 @@ def save_df_to_s3(df, s3_uri):
         print(f"Erro ao salvar no S3: {e}")
         raise
 
-# NOVO: Bloco de execução principal
+
+
+
+
 if __name__ == "__main__":
-    # 1. Configura o parser de argumentos
     parser = argparse.ArgumentParser(description="Scraper de reviews do Mercado Livre.")
     parser.add_argument(
         "--product-id",
@@ -127,14 +130,11 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    # 2. Executa o scraping
     print(f"Iniciando scraping para o produto: {args.product_id}")
     reviews_df = scrape_reviews(product_id=args.product_id)
     
-    # 3. Salva o resultado no S3
     if reviews_df is not None and not reviews_df.empty:
         save_df_to_s3(reviews_df, args.output_uri)
     else:
         print("Nenhuma review encontrada ou erro no scraping.")
 
-#docker run --rm -e AWS_ACCESS_KEY_ID=KEY -e AWS_SECRET_ACCESS_KEY=KEY scraper-app --product-id "MLB-1949413403" --output-uri "s3://s3-raw-bianca/reviews_mercadolivre/MLB-1951114616/reviews.csv"

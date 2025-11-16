@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class SentimentClassifier():
-    #esse  odel_path é um modelo de bertimbau finetunado para análise de sentimento em português.
+    #esse  model_path é um modelo de bertimbau finetunado para análise de sentimento em português.
     def __init__(self, model_path="lipaoMai/BERT-sentiment-analysis-portuguese"):
         #Carrega o tokenizer adequado para o modelo BERTimbau. Tokenizer é responsável por converter o texto em números que o modelo pode entender.
         #Ele transforma frases em IDs numéricos que representam palavras ou subpalavras.

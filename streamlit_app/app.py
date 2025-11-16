@@ -8,12 +8,15 @@ import json
 import os
 from datetime import datetime, timedelta
 import streamlit as st
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 st.set_page_config(page_title="MeLi Classifier", layout="wide")
 
-s3_bucket = "s3-raw-bianca" 
-dag_id = "meli_orchestrator" 
+s3_bucket = os.environ.get("S3_BUCKET") 
+dag_id = os.environ.get("DAG_ID") 
 airflow_api_url = os.environ.get("AIRFLOW_API_URL")
 airflow_api_user = os.environ.get("AIRFLOW_API_USER")
 airflow_api_password = os.environ.get("AIRFLOW_API_PASS")
@@ -80,7 +83,6 @@ def trigger_airflow_dag(product_id, airflow_api_password, airflow_api_user):
     Isso diz ao Airflow: "Comece a rodar o pipeline para este product_id".
     """
     dag_run_url = f"{airflow_api_url.rstrip('/')}/api/v1/dags/{dag_id}/dagRuns"
-    #dag_run_url = 'http://localhost:8081/api/v1/dags/meli_orchestrator/dagRuns'
 
     payload = {"conf": {"product_id": product_id}}
     
@@ -279,52 +281,75 @@ def display_results_dashboard(results, product_id):
 def main():
     """Função principal que orquestra a aplicação Streamlit."""
 
-    # 1. Aplica o CSS customizado
-    display_css()
+    if "show_dashboard" not in st.session_state:
+        st.session_state.show_dashboard = False
+        st.session_state.final_results = None
+        st.session_state.product_id = None
 
-    # # 2. Mostra o cabeçalho e o formulário de busca
+    display_css()
     product_id, submit = display_header_and_form()
 
-    # # 3. Cria um "placeholder" que podemos atualizar ou limpar
-    placeholder = st.empty() 
+    if st.session_state.show_dashboard:
+        if st.session_state.final_results:
+            display_results_dashboard(
+                results=st.session_state.final_results, 
+                product_id=st.session_state.product_id
+            )
+        st.session_state.show_dashboard = False
+        st.session_state.final_results = None
+        st.session_state.product_id = None
+        return 
+    
 
-    # # 4. Lógica de execução (só roda se o botão "Analisar" for clicado)
     if submit and product_id:
+        placeholder = st.empty() 
+        placeholder.markdown(
+            """
+            <div style="display: flex; justify-content: center; ...">
+                <h4 style="color: black;">🔎 Verificando análises existentes...</h4>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        prediction_results = read_s3_file(
+            product_id=product_id, 
+            s3_bucket=s3_bucket, 
+            show_message=True 
+        )
         
-        # 4.1. Mostra uma mensagem de "buscando"
-        with placeholder.container(): 
-            st.markdown(
-                """
-                <div style="display: flex; justify-content: center; align-items: center; height: 40vh;">
-                    <h4 style="color: black;">🔎 Verificando análises existentes...</h4>
-                </div>
-                """,
-                unsafe_allow_html=True
+        placeholder.empty() 
+
+        if prediction_results is not None:
+            st.session_state.final_results = prediction_results
+            st.session_state.product_id = product_id
+            st.session_state.show_dashboard = True
+            st.rerun() 
+
+        else:
+            display_processing_message(product_id)
+            trigger_airflow_dag(
+                product_id=product_id,
+                airflow_api_password=airflow_api_password,
+                airflow_api_user=airflow_api_user
             )
 
-        # 4.2. Tenta carregar os resultados JÁ PRONTOS do S3
-        prediction_results = read_s3_file(product_id=product_id, s3_bucket=s3_bucket)
-        
-        # # 4.3. Limpa a mensagem "buscando"
-        placeholder.empty()
-
-        # # 4.4. Decide o que fazer:
-        if prediction_results is None:
-            display_processing_message(product_id)
-            trigger_airflow_dag(product_id=product_id, airflow_api_password=airflow_api_password, airflow_api_user=airflow_api_user)
-            
             for i in range(10):
                 time.sleep(30)
-                prediction_results = read_s3_file(product_id=product_id, s3_bucket=s3_bucket, show_message=False)
+                
+                prediction_results = read_s3_file(
+                    product_id=product_id,
+                    s3_bucket=s3_bucket,
+                    show_message=False 
+                )
+
                 if prediction_results is not None:
-                    placeholder.empty()
-                    display_results_dashboard(results=prediction_results, product_id=product_id)
+                    st.session_state.final_results = prediction_results
+                    st.session_state.product_id = product_id
+                    st.session_state.show_dashboard = True
+                    st.rerun() 
                     break
-            
-        else:
-            display_results_dashboard(results=prediction_results, product_id=product_id)
-
-
-
+            else:
+                st.error("Não foi possível obter os resultados após 10 tentativas.")
 
 main()

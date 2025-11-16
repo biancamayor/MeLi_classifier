@@ -1,0 +1,121 @@
+networks:
+  meli-net:
+    driver: bridge
+
+volumes:
+  db-data:
+  airflow-logs:
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: meli-postgres
+    networks:
+      - meli-net
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow-webserver:
+    build:
+      context: ./local-airflow
+      dockerfile: Dockerfile.airflow
+    container_name: meli-airflow-webserver 
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meli-net
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8081:8080"
+    environment:
+      - AIRFLOW_UID=${AIRFLOW_UID}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      - AIRFLOW__WEBSERVER__RBAC=True
+      - AIRFLOW__WEBSERVER__AUTHENTICATE=True
+      - AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth
+
+    command: >
+      bash -c " \
+        airflow db init && \
+        airflow users create \
+          -u ${AIRFLOW_UI_USER} \
+          -p ${AIRFLOW_UI_PASS} \
+          -r Admin \
+          -e ${AIRFLOW_UI_EMAIL} \
+          -f ${AIRFLOW_UI_FIRSTNAME} \
+          -l ${AIRFLOW_UI_LASTNAME} && \
+        airflow webserver \
+      "
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+
+  airflow-scheduler:
+    build:
+      context: ./local-airflow
+      dockerfile: Dockerfile.airflow
+    container_name: meli-airflow-scheduler
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - meli-net
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AIRFLOW_UID=${AIRFLOW_UID}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      - AIRFLOW__WEBSERVER__RBAC=True
+      - AIRFLOW__WEBSERVER__AUTHENTICATE=True
+      - AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth
+    command: airflow scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  streamlit:
+    build:
+      context: ./streamlit_app
+      dockerfile: Dockerfile
+    container_name: meli-streamlit
+    restart: always
+    networks:
+      - meli-net
+    ports:
+      - "8501:8501"
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+    environment:
+      - AIRFLOW_API_URL=${AIRFLOW_API_URL}
+      - AIRFLOW_API_USER=${AIRFLOW_API_USER}
+      - AIRFLOW_API_PASS=${AIRFLOW_API_PASS}
+      - S3_BUCKET=${S3_BUCKET}
+      - DAG_ID=${DAG_ID}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
