@@ -12,7 +12,6 @@ Diferente de scripts monolíticos, este projeto segue uma mentalidade de micross
 
 ## 🏗️ Arquitetura do Pipeline
 
-```mermaid
 graph LR
     User((Usuário)) -->|Insere ID| Streamlit[🖥️ Dashboard Streamlit]
     Streamlit -->|Verifica Cache| S3[(☁️ AWS S3 Data Lake)]
@@ -31,7 +30,6 @@ graph LR
     Analyzer -->|Salva Processed JSON| S3
 
     S3 -->|Lê JSON Final| Streamlit
-```
 
 ## 🔄 Fluxo de Dados
 
@@ -94,7 +92,7 @@ docker-compose up --build
 
 ### Passo 5 — Configurar Airflow
 - Acesse **http://localhost:8081**  
-  Login: `admin` / Senha: `admin`
+  Login: `seulogin` / Senha: `suasenha`
 - Vá em *Admin → Variables*  
 - Adicione:
   - `AWS_ACCESS_KEY_ID`
@@ -141,4 +139,4 @@ Insira um ID de produto (ex.: `MLB-12345678`) e acompanhe o pipeline rodar.
 ## 📞 Contato
 
 Desenvolvido por **Bianca**  
-💼 LinkedIn: https://www.linkedin.com/in/bianca-mayor lipi=urn%3Ali%3Apage%3Ad_flagship3_profile_view_base_contact_details%3BqS8%2FhYdnRCCTOI1BzOd%2F1Q%3D%3D
+💼 LinkedIn: https://www.linkedin.com/in/bianca-mayor 
