@@ -1,6 +1,6 @@
 # 📦 MeLi Classifier: Ecossistema de Engenharia de Dados & NLP
 
-Uma solução de ponta a ponta para extração, processamento e análise de sentimentos de reviews do Mercado Livre, orquestrada via Airflow.
+Uma plataforma completa de Engenharia de Dados para extração (EL), transformação (T) e análise de sentimentos em larga escala, utilizando arquitetura de microsserviços orquestrada.
 
 ## 🧠 O Que Este Projeto Faz? (Para Leigos e Especialistas)
 
@@ -32,7 +32,7 @@ Em vez de um programa gigante, temos 3 programas independentes:
 
     - O Scraper (Worker 1): Especialista em ir à web e buscar dados brutos.
 
-    - O Analisador (Worker 2): Um computador potente com GPU/CPU dedicada apenas para rodar modelos pesados de IA (BERT).
+    - O Analisador (Worker 2): Um computador dedicado apenas para rodar modelos pesados de IA (BERT).
 
 2. Orquestração (O "Cérebro")
 
@@ -44,19 +44,19 @@ Nada fica salvo "na máquina". Tudo vai para a nuvem (AWS S3). Isso garante que 
 
 ## 🚀 Tecnologias e Decisões Técnicas
 
-- **🕷️ Extração de Dados (Scraper)**
+**🕷️ Extração de Dados (Scraper)**
 
 - Desafio: O Mercado Livre tem estruturas HTML complexas e dinâmicas.
 
 - Solução: Script Python resiliente que navega por paginação, trata erros de rede e normaliza os dados brutos antes de enviar para o Data Lake.
 
-- **🧠 Inteligência Artificial (Analyzer)**
+**🧠 Inteligência Artificial (Analyzer)**
 
 - Desafio: Análise de sentimento tradicional (baseada em palavras positivas/negativas) falha em português (ex: "Não gostei nada" tem a palavra "gostei").
 
 - Solução: Uso do BERTimbau, um modelo Transformer (estado da arte em NLP) pré-treinado especificamente em português brasileiro pela NeuralMind. Ele entende contexto, negação e sarcasmo.
 
-- **⚙️ Engenharia (Docker & Airflow)**
+**⚙️ Engenharia (Docker & Airflow)**
 
 - Docker-in-Docker: Uma técnica avançada onde o Airflow não executa o código Python diretamente. Ele usa o DockerOperator para criar, executar e destruir containers inteiros para cada tarefa. Isso garante isolamento total de dependências (o Scraper não precisa ter o PyTorch instalado, e o Analyzer não precisa de bibliotecas web).
 
@@ -87,7 +87,7 @@ Nada fica salvo "na máquina". Tudo vai para a nuvem (AWS S3). Isso garante que 
 
 ### Infraestrutura & Orquestração
 - Docker + Docker Compose  
-- Apache Airflow 3.0  
+- Apache Airflow  
 - AWS S3 (Data Lake)
 
 ### Microsserviços
