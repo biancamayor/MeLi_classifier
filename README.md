@@ -1,35 +1,78 @@
-# 📦 MeLi Classifier: Pipeline de Engenharia de Dados & NLP
+# 📦 MeLi Classifier: Ecossistema de Engenharia de Dados & NLP
 
 Uma solução de ponta a ponta para extração, processamento e análise de sentimentos de reviews do Mercado Livre, orquestrada via Airflow.
 
-## 🧠 Sobre o Projeto
+## 🧠 O Que Este Projeto Faz? (Para Leigos e Especialistas)
 
-O **MeLi Classifier** é um pipeline completo de Engenharia de Dados aliado a técnicas modernas de NLP.
+Imagine que você quer saber se um produto no Mercado Livre é bom ou ruim, mas ele tem milhares de comentários. Ler um por um é impossível.
 
-O objetivo é extrair comentários de produtos do Mercado Livre, processá-los utilizando modelos avançados em português (BERTimbau) e entregar insights claros sobre a percepção dos consumidores.
+O MeLi Classifier automatiza esse processo de forma inteligente e escalável:
 
-Diferente de scripts monolíticos, este projeto segue uma mentalidade de microsserviços, usando containers independentes, Data Lake no S3 e orquestração com Apache Airflow.
+1) Busca todos os comentários de um produto automaticamente.
 
-## 🏗️ Arquitetura do Pipeline
+2) Lê e Interpreta cada comentário usando Inteligência Artificial (não apenas palavras-chave, mas entendendo o contexto e a ironia).
 
-graph LR
-    User((Usuário)) -->|Insere ID| Streamlit[🖥️ Dashboard Streamlit]
-    Streamlit -->|Verifica Cache| S3[(☁️ AWS S3 Data Lake)]
+3) Classifica se o sentimento é Positivo ou Negativo.
 
-    subgraph "Orquestração (Docker/Airflow)"
-    Streamlit -.->|Dispara via API| Airflow[⚙️ Apache Airflow Scheduler]
-    Airflow -->|DockerOperator| Scraper[🕷️ Container Scraper]
-    Airflow -->|DockerOperator| Analyzer[🧠 Container Analyzer BERT]
-    end
+3) Gera um Dashboard com métricas de confiança e exemplos práticos.
 
-    Scraper -->|Extrai Dados| Web[Mercado Livre]
-    Scraper -->|Salva Raw CSV| S3
+A grande diferença? Isso não roda tudo num único script no meu computador. É um sistema complexo onde cada tarefa é feita por um "robô" (container) diferente, todos coordenados por um "gerente" (Airflow) na nuvem.
 
-    Analyzer -->|Lê Raw CSV| S3
-    Analyzer -->|Processa (NLP)| BERT[Modelo BERTimbau]
-    Analyzer -->|Salva Processed JSON| S3
+## 🏗️ A Arquitetura (Por Que é Complexo?)
 
-    S3 -->|Lê JSON Final| Streamlit
+A maioria dos projetos de dados iniciantes são "monólitos": um único arquivo Python que faz tudo. Se o scraping falhar, a análise para. Se o modelo de IA for pesado, o site trava.
+
+Este projeto adota uma Arquitetura de Engenharia de Dados Profissional:
+
+1. Desacoplamento Total (Microsserviços)
+
+Em vez de um programa gigante, temos 3 programas independentes:
+
+    - O Dashboard (Frontend): Apenas mostra dados. Não processa nada pesado.
+
+    - O Scraper (Worker 1): Especialista em ir à web e buscar dados brutos.
+
+    - O Analisador (Worker 2): Um computador potente com GPU/CPU dedicada apenas para rodar modelos pesados de IA (BERT).
+
+2. Orquestração (O "Cérebro")
+
+Usamos o Apache Airflow, a ferramenta padrão da indústria para pipelines de dados. Ele decide quando ligar cada robô, verifica se eles terminaram com sucesso e tenta novamente em caso de falha.
+
+3. Data Lake (A "Memória")
+
+Nada fica salvo "na máquina". Tudo vai para a nuvem (AWS S3). Isso garante que os dados persistam mesmo que os servidores sejam destruídos e recriados (o que acontece a cada execução).
+
+## 🚀 Tecnologias e Decisões Técnicas
+
+- **🕷️ Extração de Dados (Scraper)**
+
+- Desafio: O Mercado Livre tem estruturas HTML complexas e dinâmicas.
+
+- Solução: Script Python resiliente que navega por paginação, trata erros de rede e normaliza os dados brutos antes de enviar para o Data Lake.
+
+- **🧠 Inteligência Artificial (Analyzer)**
+
+- Desafio: Análise de sentimento tradicional (baseada em palavras positivas/negativas) falha em português (ex: "Não gostei nada" tem a palavra "gostei").
+
+- Solução: Uso do BERTimbau, um modelo Transformer (estado da arte em NLP) pré-treinado especificamente em português brasileiro pela NeuralMind. Ele entende contexto, negação e sarcasmo.
+
+- **⚙️ Engenharia (Docker & Airflow)**
+
+- Docker-in-Docker: Uma técnica avançada onde o Airflow não executa o código Python diretamente. Ele usa o DockerOperator para criar, executar e destruir containers inteiros para cada tarefa. Isso garante isolamento total de dependências (o Scraper não precisa ter o PyTorch instalado, e o Analyzer não precisa de bibliotecas web).
+
+
+## 📂 Estrutura do Repositório
+
+- **airflow/:** Contém as DAGs (os "mapas" do fluxo de trabalho) que dizem ao Airflow o que fazer.
+
+- **analyzer-app/:** O código do modelo de IA. Possui seu próprio Dockerfile e requirements.txt (pesado, com PyTorch).
+
+- **scraper-app/:** O código de coleta de dados. Possui seu próprio Dockerfile (leve).
+
+- **streamlit_app/:**  O site em Streamlit. Possui lógica de "polling" para verificar no S3 se os dados já estão prontos.
+
+- **docker-compose.yml:** O maestro que sobe toda a infraestrutura localmente (Banco de dados, Webserver, Scheduler e Frontend).
+
 
 ## 🔄 Fluxo de Dados
 
@@ -55,9 +98,10 @@ graph LR
 ## 🚀 Como Executar Localmente
 
 ### Pré-requisitos
-- Docker + Docker Compose  
+- Docker Desktop instalado e rodando + Docker Compose  
 - Bucket S3 configurado  
-- Credenciais AWS exportadas no ambiente  
+- Credenciais AWS exportadas no ambiente com permissão de leitura/escrita em um bucket S3.
+
 
 ### Passo 1 — Clonar o repositório
 ```bash
@@ -79,7 +123,7 @@ $env:AWS_ACCESS_KEY_ID="sua_chave"
 $env:AWS_SECRET_ACCESS_KEY="sua_senha"
 ```
 
-### Passo 3 — Build das imagens
+### Passo 3 — Construa os Workers: Precisamos criar as imagens dos "robôs" que o Airflow vai usar
 ```bash
 cd scraper-app && docker build -t scraper-app:latest . && cd ..
 cd analyzer-app && docker build -t analyzer-app:latest . && cd ..
@@ -99,7 +143,7 @@ docker-compose up --build
   - `AWS_SECRET_ACCESS_KEY`
 - Ative a DAG `meli_orchestrator`
 
-### Passo 6 — Usar o Dashboard
+### Passo 6 — Usar o Streamlit
 Acesse: **http://localhost:8501**
 
 Insira um ID de produto (ex.: `MLB-12345678`) e acompanhe o pipeline rodar.
